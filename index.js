@@ -5,6 +5,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
 } = require("discord.js");
+var AES = require("crypto-js/aes");
 const { createOAuthDeviceAuth } = require("@octokit/auth-oauth-device");
 const { Octokit } = require("@octokit/core");
 const JSONdb = require('simple-json-db');
@@ -29,6 +30,28 @@ client.on("interactionCreate", async (interaction) => {
 
   if (interaction.commandName === "ping") {
       await interaction.reply("Pong!");
+  }
+  if (interaction.commandName === "botinfo") {
+    const infoBtn = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setStyle(ButtonStyle.Link)
+            .setLabel("GitHub")
+            .setURL(
+                `https://github.com/andrewstech/is-a-dev-bot`
+            )
+    );
+    await interaction.reply({ components: [infoBtn], ephemeral: true });
+  }
+  if (interaction.commandName === "github") {
+    const gitBtn = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setStyle(ButtonStyle.Link)
+            .setLabel("GitHub")
+            .setURL(
+                `https://github.com/is-a-dev/register`
+            )
+    );
+    await interaction.reply({ components: [gitBtn], ephemeral: true });
   }
   if (interaction.commandName === "check") {
       var subdomain = interaction.options.getString("subdomain");
@@ -61,15 +84,17 @@ client.on("interactionCreate", async (interaction) => {
           await interaction.reply("You are already logged in!");
           return;
       }
+      await interaction.reply({ content: `Please Wait`, ephemeral: true, fetchReply: true });
+      var encrypted = CryptoJS.AES.encrypt(interaction.user.id, process.env.ENCRIPTION);
       const loginBtn = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
               .setStyle(ButtonStyle.Link)
               .setLabel("Login with GitHub")
               .setURL(
-                  `https://register-bot.is-a.dev/login?user=${interaction.user.id}`
+                  `https://register-bot.is-a.dev/login?user=${encrypted}`
               )
       );
-      await interaction.reply({ components: [loginBtn], ephemeral: true });
+      await interaction.editReply({ components: [loginBtn], ephemeral: true });
   }
   if (interaction.commandName === "user") {
       if (!db.has(interaction.user.id)) {
@@ -88,6 +113,8 @@ client.on("interactionCreate", async (interaction) => {
             await interaction.reply("You are not logged in!");
             return;
         }
+        await interaction.reply({ content: `Please Wait`, ephemeral: true });
+        await interaction.editReply({ content: `Forked`, ephemeral: true });
         var subdomain = interaction.options.getString('subdomain');
         var type = interaction.options.getString('type');
         var content = interaction.options.getString('content');
@@ -108,31 +135,9 @@ client.on("interactionCreate", async (interaction) => {
             "type": type,
             "content": LowcaseContent,
         },
-        }).then(async (res) => {
-            if (res.status && res.status == "202") {
-                console.log("PR!");
-                await delay(1000);
-                var octokit = new Octokit({
-                    auth: token,
-                });
-            
-                var res = octokit.request(
-                    "GET /repos/{owner}/{repo}/pulls?head=" + { username } + ":main",
-                    {
-                        owner: "is-a-dev",
-                        repo: "register",
-                        user: username,
-                    }
-                );
-                // reult data html_url
-                var prurl = res.data[0].html_url;
-                await interaction.reply(
-                    "Your PR has been created! " + prurl
-                );
-            }
-        });
-        console.log("Request sent!");
-        await interaction.reply({ content: `Subdomain: ${subdomain}\nType: ${type}\nContent: ${content}`, ephemeral: true });
+        })
+         console.log("Request sent!");
+        await interaction.editReply({ content: `Subdomain: ${subdomain}\nType: ${type}\nContent: ${content}`, ephemeral: true });
     }
 });
 

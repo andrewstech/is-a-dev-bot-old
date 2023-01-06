@@ -1,10 +1,18 @@
 const { REST, Routes } = require('discord.js');
-const { TOKEN } = require('./config.json');
+require('dotenv').config();
 
 const commands = [
   {
     name: 'ping',
     description: 'Replies with Pong!',
+  },
+  {
+    name: 'github',
+    description: 'Github!',
+  },
+  {
+    name: 'botinfo',
+    description: 'Replies with bot info!',
   },
   {
     name: 'login',
@@ -70,7 +78,7 @@ const commands = [
   }
 ];
 
-const rest = new REST({ version: '10' }).setToken(TOKEN);
+const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
 (async () => {
   try {
