@@ -65,7 +65,7 @@ server.post ('/api/email', upload.none(), (req, res) => {
   console.log(`Subject: ${body.subject}`);
   console.log(`Text: ${body.text}`);
   // send to discord webhook
-  const webhookClient = new WebhookClient({ url: 'https://discord.com/api/webhooks/1062110685888254072/bQ8xtZyrZAVjeLPNbXB3MA4xKB2sB2nulWV2rrQt81HTGVmcOmTE0KMgPLmKbRu-t45F' });
+  const webhookClient = new WebhookClient({ url: process.env.webhook });
   const embed = {
     "type": "rich",
     "title": `Email from: ${body.from}`,
