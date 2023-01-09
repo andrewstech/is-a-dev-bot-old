@@ -12,7 +12,7 @@ import { getAnalytics } from "firebase/analytics";
 
 firebase.initializeApp({
   apiKey: "AIzaSyCqxZkqE4TqwCQbKRr2cHQ5tHCEVyufoB4",
-  authDomain: "is-a-dev-bot.firebaseapp.com",
+  authDomain: "is-a.dev.open-domains.net",
   projectId: "is-a-dev-bot",
   storageBucket: "is-a-dev-bot.appspot.com",
   messagingSenderId: "872086985892",

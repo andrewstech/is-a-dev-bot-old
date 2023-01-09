@@ -129,11 +129,6 @@ client.on("interactionCreate", async (interaction) => {
       fetchReply: true,
     });
 
-    var encrypted = CryptoJS.AES.encrypt(
-      interaction.user.id,
-      process.env.ENCRIPTION
-    );
-
     const loginBtn = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
 
@@ -141,7 +136,7 @@ client.on("interactionCreate", async (interaction) => {
 
         .setLabel("Login with GitHub")
 
-        .setURL(`https://register-bot.is-a.dev/login?user=${encrypted}`)
+        .setURL(`https://register-bot.is-a.dev/login?user=${interaction.user.id}`)
     );
 
     await interaction.editReply({ components: [loginBtn], ephemeral: true });
