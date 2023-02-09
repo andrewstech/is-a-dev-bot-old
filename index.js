@@ -179,7 +179,7 @@ client.on("interactionCreate", async (interaction) => {
               .addFields(
                 {
                   name: "Your Domains",
-                  value: ` ${results.join('\n ')} `,
+                  value: ` ${results.join('\n')} `,
                 },
               )
               .setColor("#00b0f4")
