@@ -7,6 +7,8 @@ const {
 
   ButtonBuilder,
 
+  EmbedBuilder,
+
   ButtonStyle,
 } = require("discord.js");
 
@@ -141,6 +143,106 @@ client.on("interactionCreate", async (interaction) => {
 
     await interaction.editReply({ components: [loginBtn], ephemeral: true });
   }
+  
+  if (interaction.commandName === "domains") {
+    var username = interaction.options.getString("username");
+    if (username == null){
+      // your code here.
+      if (!db.has(interaction.user.id)) {
+        await interaction.reply("You are not logged in!");
+      
+        return;
+      }
+      fetch('https://raw.is-a.dev')
+        .then(response => response.json())
+        .then(async data => {
+  
+          let username = db.get(interaction.user.id);
+          let found = false;
+          let results = [];
+  
+          for (var i = 0; i < data.length; i++) {
+              if (data[i].owner.username.toLowerCase() === username.toLowerCase()) {
+                results.push(data[i].domain);
+                found = true;
+              }
+          }
+          if (found) {
+            var count = results.length;
+            var embed = new EmbedBuilder()
+              .setAuthor({
+                name: "Is a dev BOT",
+                url: "https://is-a.dev",
+                iconURL: "https://raw.githubusercontent.com/is-a-dev/register/main/media/logo.png",
+              })
+              .setDescription("You own ``" + count + "`` domains")
+              .addFields(
+                {
+                  name: "Your Domains",
+                  value: ` ${results.join('\n ')} `,
+                },
+              )
+              .setColor("#00b0f4")
+              .setFooter({
+                text: "©IS-A-DEV",
+                iconURL: "https://raw.githubusercontent.com/is-a-dev/register/main/media/logo.png",
+              });
+            await interaction.reply({ embeds: [embed] });
+          }
+  
+          if (!found) {
+            await interaction.reply(`Username "${username}" has not registed any domains.`);
+          }
+          });
+
+          return;
+    }
+    fetch('https://raw.is-a.dev')
+        .then(response => response.json())
+        .then(async data => {
+  
+          let found = false;
+          let results = [];
+  
+          for (var i = 0; i < data.length; i++) {
+              if (data[i].owner.username.toLowerCase() === username.toLowerCase()) {
+                results.push(data[i].domain);
+                found = true;
+              }
+          }
+          if (found) {
+            var count = results.length;
+            var embed = new EmbedBuilder()
+              .setAuthor({
+                name: "Is a dev BOT",
+                url: "https://is-a.dev",
+                iconURL: "https://raw.githubusercontent.com/is-a-dev/register/main/media/logo.png",
+              })
+              .setDescription(username + " owns ``" + count + "`` domains")
+              .addFields(
+                {
+                  name: "Domains",
+                  value: ` ${results.join('\n ')} `,
+                },
+              )
+              .setColor("#00b0f4")
+              .setFooter({
+                text: "©IS-A-DEV",
+                iconURL: "https://raw.githubusercontent.com/is-a-dev/register/main/media/logo.png",
+              });
+            await interaction.reply({ embeds: [embed] });
+          }
+  
+          if (!found) {
+            await interaction.reply(`Username "${username}" has not registed any domains.`);
+          }
+          });
+
+
+    
+  }
+
+
 
   if (interaction.commandName === "user") {
     if (!db.has(interaction.user.id)) {
