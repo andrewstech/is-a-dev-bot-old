@@ -157,9 +157,9 @@ client.on("interactionCreate", async (interaction) => {
         .then(response => response.json())
         .then(async data => {
   
-          let username = db.get(interaction.user.id);
-          let found = false;
-          let results = [];
+          var username = db.get(interaction.user.id);
+          var found = false;
+          var results = [];
   
           for (var i = 0; i < data.length; i++) {
               if (data[i].owner.username.toLowerCase() === username.toLowerCase()) {
@@ -201,8 +201,8 @@ client.on("interactionCreate", async (interaction) => {
         .then(response => response.json())
         .then(async data => {
   
-          let found = false;
-          let results = [];
+          var found = false;
+          var results = [];
   
           for (var i = 0; i < data.length; i++) {
               if (data[i].owner.username.toLowerCase() === username.toLowerCase()) {
@@ -286,14 +286,14 @@ client.on("interactionCreate", async (interaction) => {
     }
     await interaction.editReply({ content: `Forked`, ephemeral: true });
 
-    var subdomain = interaction.options.getString("subdomain");
+    subdomain = interaction.options.getString("subdomain");
 
     var type = interaction.options.getString("type");
 
     var content = interaction.options.getString("content");
 
 
-    var username = db.get(interaction.user.id);
+    username = db.get(interaction.user.id);
 
     var email = dbemail.get(interaction.user.id);
 
@@ -344,4 +344,4 @@ client.on("interactionCreate", async (interaction) => {
 
 keepAlive();
 
-client.login(process.env.TOKEN);
+client.login(process.env.BOT_TOKEN);

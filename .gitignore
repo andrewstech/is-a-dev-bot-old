@@ -1,0 +1,8 @@
+# NPM Generated Files and Directories
+node_modules/
+
+# User Generated Files and Directories
+.vscode/settings.json
+
+# ENVIRONMENT VARIABLES
+*.env
