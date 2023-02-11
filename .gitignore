@@ -4,5 +4,10 @@ node_modules/
 # User Generated Files and Directories
 .vscode/settings.json
 
-# ENVIRONMENT VARIABLES
+# Environment Variables
+.env
 *.env
+
+# Secrets
+storage*.json
+storage.json
