@@ -270,6 +270,8 @@ client.on("interactionCreate", async (interaction) => {
     await interaction.reply({ content: `Please Wait`, ephemeral: true });
     var token = userdb.get(interaction.user.id);
 
+    console.log(token);
+
     const response = await fetch("https://dns.beadman-network.com/api/fork", {
       method: "get",
       headers: {
@@ -292,14 +294,13 @@ client.on("interactionCreate", async (interaction) => {
 
     var content = interaction.options.getString("content");
 
-
     username = db.get(interaction.user.id);
 
     var email = dbemail.get(interaction.user.id);
 
-    var prosubdomain = subdomain.lowercase();
+    var prosubdomain = subdomain.toLowerCase();
 
-    var LowcaseContent = content.lowercase();
+    var LowcaseContent = content.toLowerCase();
 
     console.log("Request sent!");
 
