@@ -297,9 +297,9 @@ client.on("interactionCreate", async (interaction) => {
 
     var email = dbemail.get(interaction.user.id);
 
-    var prosubdomain = subdomain.lowercase();
+    var prosubdomain = subdomain.tolowercase();
 
-    var LowcaseContent = content.lowercase();
+    var LowcaseContent = content.tolowercase();
 
     console.log("Request sent!");
 
