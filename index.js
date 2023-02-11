@@ -191,7 +191,7 @@ client.on("interactionCreate", async (interaction) => {
           }
   
           if (!found) {
-            await interaction.reply(`Username "${username}" has not registed any domains.`);
+            await interaction.reply(`Unable to find domains linked to user "${username}"!`);
           }
           });
 
@@ -222,7 +222,7 @@ client.on("interactionCreate", async (interaction) => {
               .addFields(
                 {
                   name: "Domains",
-                  value: ` ${results.join('\n ')} `,
+                  value: ` ${results.join('\n')} `,
                 },
               )
               .setColor("#00b0f4")
@@ -268,7 +268,22 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     await interaction.reply({ content: `Please Wait`, ephemeral: true });
+    var token = userdb.get(interaction.user.id);
 
+    const response = await fetch("https://dns.beadman-network.com/api/fork", {
+      method: "get",
+      headers: {
+        "Content-Type": "application/json",
+
+        "x-gh-auth": token,
+      },
+    });
+    // check if the response is ok
+    if (!response.ok) {
+      // if not, throw an error
+      await interaction.editReply({ content: `Error has occured while forking the repo. HTTP error, status  ${response.status}`, ephemeral: true });
+      return;
+    }
     await interaction.editReply({ content: `Forked`, ephemeral: true });
 
     var subdomain = interaction.options.getString("subdomain");
@@ -277,7 +292,6 @@ client.on("interactionCreate", async (interaction) => {
 
     var content = interaction.options.getString("content");
 
-    var token = userdb.get(interaction.user.id);
 
     var username = db.get(interaction.user.id);
 
@@ -289,7 +303,7 @@ client.on("interactionCreate", async (interaction) => {
 
     console.log("Request sent!");
 
-    fetch("https://register.is-a.dev/api/commit", {
+    const commit = await fetch("https://dns.beadman-network.com/api/commit", {
       method: "post",
 
       headers: {
@@ -308,6 +322,13 @@ client.on("interactionCreate", async (interaction) => {
         content: LowcaseContent,
       },
     });
+    // check if the response is ok
+    if (!commit.ok) {
+      // if not, throw an error
+      await interaction.editReply({ content: `Error has occured while commiting the repo. HTTP error, status  ${commit.status}`, ephemeral: true });
+      return;
+    }
+    await interaction.editReply({ content: `Committed`, ephemeral: true });
 
     console.log("Request sent!");
 
@@ -317,6 +338,9 @@ client.on("interactionCreate", async (interaction) => {
     });
   }
 });
+
+
+
 
 keepAlive();
 
