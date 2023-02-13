@@ -1,511 +1,251 @@
-const {
-  Client,
-
-  GatewayIntentBits,
-
-  ActionRowBuilder,
-
-  ButtonBuilder,
-
-  EmbedBuilder,
-
-  TextInputBuilder,
-
-  DropdownBuilder,
-
-  ModalBuilder,
-
-  TextInputStyle,
-
-  ButtonStyle,
-} = require("discord.js");
-
-const Discord = require('discord.js');
-
-var AES = require("crypto-js/aes");
-
-const { createOAuthDeviceAuth } = require("@octokit/auth-oauth-device");
-
+const express = require("express"); //Line 1
+const app = express(); //Line 2
 const { Octokit } = require("@octokit/core");
-
-const JSONdb = require("simple-json-db");
-
-const fetch = require("node-fetch");
-
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-
-const keepAlive = require("./server");
-
+const { Base64 } = require("js-base64");
+const bodyParser = require('body-parser')
+const { createTokenAuth } = require("@octokit/auth-token");
+const path = require("path");
+const isDomainValid = require("is-domain-valid");
+const { response } = require("express");
+const sgMail = require("@sendgrid/mail");
 require("dotenv").config();
+const {HttpClient} = require('@actions/http-client')
+const {ErrorHandler, BadRequestError} = require('express-json-api-error-handler')
 
-const { db, userdb, dbemail, maintainerdb, betadb } = require("./database");
+const multer = require("multer");
 
-const { isValidURL, delay, ValidateIPaddress } = require("./tools");
+var maintainers = ["andrew@win11react.com"];
 
-const Sentry = require("@sentry/node");
-// or use es6 import statements
-// import * as Sentry from '@sentry/node';
+const upload = multer();
+const port = process.env.PORT || 5000;
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-const Tracing = require("@sentry/tracing");
-// or use es6 import statements
-// import * as Tracing from '@sentry/tracing';
-
-Sentry.init({
-  dsn: "https://26418f26472e449494e582986f00dda6@o1276241.ingest.sentry.io/4504674686468096",
-
-  // Set tracesSampleRate to 1.0 to capture 100%
-  // of transactions for performance monitoring.
-  // We recommend adjusting this value in production
-  tracesSampleRate: 1.0,
-});
-
-const transaction = Sentry.startTransaction({
-  op: "test",
-  name: "My First Test Transaction",
-});
-
-setTimeout(() => {
-  try {
-    foo();
-  } catch (e) {
-    Sentry.captureException(e);
-  } finally {
-    transaction.finish();
-  }
-}, 99);
-
-// Error Handling
-
-client.on("error", () => console.error);
-
-client.on("warn", () => console.warn);
-
-process.on("unhandledRejection", console.error);
-
-client.on("ready", () => {
-  console.log(`Logged in as ${client.user.tag}!`);
- // set bot statu
-});
-
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
-
-  if (interaction.commandName === "ping") {
-    await interaction.reply("Pong!");
-  }
-
-  if (interaction.commandName === "botinfo") {
-    if (!betadb.has(interaction.user.id)) {
-      await interaction.reply("You are not in the beta program!");
-      return;
-    }
-    const infoBtn = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-
-        .setStyle(ButtonStyle.Link)
-
-        .setLabel("GitHub")
-
-        .setURL(`https://github.com/andrewstech/is-a-dev-bot`)
-    );
-
-    await interaction.reply({ components: [infoBtn], ephemeral: true });
-  }
-
-  if (interaction.commandName === "github") {
-    const gitBtn = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-
-        .setStyle(ButtonStyle.Link)
-
-        .setLabel("GitHub")
-
-        .setURL(`https://github.com/is-a-dev/register`)
-    );
-
-    await interaction.reply({ components: [gitBtn], ephemeral: true });
-  }
-
-  if (interaction.commandName === "check") {
-    if (!betadb.has(interaction.user.id)) {
-      await interaction.reply("You are not in the beta program!");
-      return;
-    }
-    var subdomain = interaction.options.getString("subdomain");
-
-    fetch(
-      `https://api.github.com/repos/is-a-dev/register/contents/domains/${subdomain}.json`,
+const createComment = async (http, params) => {
+    const {repoToken, owner, repo, issueNumber, body} = params
+  
+    return http.postJson(
+      `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments`,
+      {body},
       {
-        method: "GET",
-
-        headers: {
-          "User-Agent": "mtgsquad",
-        },
+        accept: 'application/vnd.github.v3+json',
+        authorization: `token ${repoToken}`,
       }
-    ).then(async (res) => {
-      if (res.status && res.status == 404) {
-        await interaction.reply(
-          "The domain: " + subdomain + ".is-a.dev" + " is not registered!"
-        );
-      } else {
-        await interaction.reply(
-          "The domain: " + subdomain + ".is-a.dev" + " is registered!"
-        );
-      }
-    });
-  }
+    )
+}
 
-  if (interaction.commandName === "logout") {
-    if (!betadb.has(interaction.user.id)) {
-      await interaction.reply("You are not in the beta program!");
-      return;
+const checkToken = async (http, token) => {
+    if (!token) {
+      return false
     }
-    if (!db.has(interaction.user.id)) {
-      await interaction.reply("You are not logged in!");
-
-      return;
+  
+    if (token === process.env.GITHUB_TOKEN) {
+      // Assume the use of this token is intentional
+      return true
     }
-
-    db.delete(interaction.user.id);
-
-    userdb.delete(interaction.user.id);
-
-    await interaction.reply("You have been logged out!");
-  }
-
-  if (interaction.commandName === "beta-add") {
-    if (!maintainerdb.has(interaction.user.id)) {
-      await interaction.reply("You are not a maintainer!");
-      return;
+  
+    try {
+      await http.getJson(`https://api.github.com/user/repos`, {
+        accept: 'application/vnd.github.v3+json',
+        authorization: `token ${token}`,
+      })
+      return false
+    } catch (err) {
+      // Far from perfect, temporary tokens are difficult to identify
+      // A bad token returns 401, and a personal token returns 200
+      return (
+        err.statusCode === 403 &&
+        err.result.message &&
+        err.result.message.startsWith('Resource not accessible by integration')
+      )
     }
-    var user = interaction.options.getUser("user");
-    betadb.set(user.id, true);
-    await interaction.reply("Added " + user.username + " to the beta program!");
-    // send a message to the user
-    const dm = await user.createDM();
-    dm.send(
-      "You have been added to the beta program for is-a.dev! Please use /login to login to the bot!"
+}
+
+
+// This displays message that the server running and listening to specified port
+app.listen(port, () => console.log(`Listening on port ${port}`));
+
+app.use((req, res, next) => {
+    req.httpClient = new HttpClient('http-client-add-pr-comment-bot')
+    next()
+})
+app.use(bodyParser.json())
+
+app.use(express.static("public"));
+
+function isValidURL(string) {
+    var res = string.match(
+        /(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)/g
     );
-    return;
-  }
+    return res !== null;
+}
 
-  if (interaction.commandName === "beta-remove") {
-    if (!maintainerdb.has(interaction.user.id)) {
-      await interaction.reply("You are not a maintainer!");
-      return;
+function delay(time) {
+    return new Promise((resolve) => setTimeout(resolve, time));
+}
+
+function ValidateIPaddress(ipaddress) {
+    if (
+        /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(
+            ipaddress
+        )
+    ) {
+        return true;
     }
-    var user = interaction.options.getUser("user");
-    betadb.delete(user.id);
-    await interaction.reply("removed " + user.username + " from the beta program.");
-    const dm = await user.createDM();
-    dm.send(
-      "You have been removed from the is-a-dev Beta Program!"
-    );
-    return;
-  }
+    return false;
+}
 
-  if (interaction.commandName === "login") {
-    if (!betadb.has(interaction.user.id)) {
-      await interaction.reply("You are not in the beta program!");
-      return;
-    }
-    if (db.has(interaction.user.id)) {
-      await interaction.reply("You are already logged in!");
+app.get("/api/fork", function (req, res, next) {
+    var auth = req.header("x-gh-auth");
+    var octokit = new Octokit({
+        auth: auth,
+    });
+    octokit
+        .request("POST /repos/{owner}/{repo}/forks", {
+            owner: "is-a-dev",
+            repo: "register",
+        })
+        .then((response) => {
+            res.send(response.status);
+        })
+        .catch((error) => {
+            res.send(error.status);
+        });
+});
 
-      return;
-    }
-
-    await interaction.reply({
-      content: `Please Wait`,
-      ephemeral: true,
-      fetchReply: true,
+app.post("/api/commit", async function (req, res) {
+    var auth = req.header("x-gh-auth");
+    var domain = req.header("domain");
+    var type = req.header("type");
+    var content = req.header("content");
+    var username = req.header("username");
+    var email = req.header("email");
+    var octokit = new Octokit({
+        auth: auth,
     });
 
-    const loginBtn = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-
-        .setStyle(ButtonStyle.Link)
-
-        .setLabel("Login with GitHub")
-
-        .setURL(`https://register-bot.is-a.dev/login?user=${interaction.user.id}`)
-    );
-
-    await interaction.editReply({ components: [loginBtn], ephemeral: true });
-  }
-  if (interaction.commandName === "maintainers") {
-    // make a discord modal with a dropdown of all the domains the user owns
-    // then delete the domain
-    //if user has role of maintainer then continue if not then return
-    if (!maintainerdb.has(interaction.user.id)) {
-      await interaction.reply("You are not a maintainer!");
-      return;
-    }
-    if (!db.has(interaction.user.id)) {
-      await interaction.reply("You are not logged in!");
-      return;
-    }
-    var username = db.get(interaction.user.id);
-    fetch('https://raw.is-a.dev')
-      .then(response => response.json())
-      .then(async data => {
-        var found = false;
-        var results = [];
-        for (var i = 0; i < data.length; i++) {
-            if (data[i].owner.username.toLowerCase() === username.toLowerCase()) {
-              results.push(data[i].domain);
-              found = true;
-            }
-        }
-        if (found) {
-          var count = results.length;
-          var domains = results;
-          const modal = new ModalBuilder()
-            .setCustomId('delteDomainModal')
-            .setTitle('Domain Deletion');
-
-          // Add components to modal
-
-          //add a select menu
-        
-
-          const domain = new TextInputBuilder()
-            .setCustomId('deletedomain')
-              // The label is the prompt the user sees for this input
-            .setLabel("What domain would you like to delete?")
-              // Short means only a single line of text
-            .setStyle(TextInputStyle.Short);
-
-
-          // An action row only holds one text input,
-          // so you need one action row per text input.
-          const firstActionRow = new ActionRowBuilder().addComponents(domain);
-
-          // Add inputs to the modal
-          modal.addComponents(firstActionRow);
-
-          // Show the modal to the user
-          await interaction.showModal(modal);
-        } else {
-          await interaction.reply("You do not own any domains!");
-        }
-      });
-
-  }
-          
-  client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isModalSubmit()) return;
-    if (interaction.customId === 'delteDomainModal') {
-      await interaction.reply({ content: 'Your submission was received successfully! However Im not going to delete that domain as I am not fully programmed.' });
-    }
-  });
-
-  if (interaction.commandName === "domains") {
-    var username = interaction.options.getString("username");
-    if (username == null){
-      // your code here.
-      if (!db.has(interaction.user.id)) {
-        await interaction.reply("You are not logged in!");
-      
-        return;
-      }
-      fetch('https://raw.is-a.dev')
-        .then(response => response.json())
-        .then(async data => {
-  
-          var username = db.get(interaction.user.id);
-          var found = false;
-          var results = [];
-  
-          for (var i = 0; i < data.length; i++) {
-              if (data[i].owner.username.toLowerCase() === username.toLowerCase()) {
-                results.push(data[i].domain);
-                found = true;
-              }
-          }
-          if (found) {
-            var count = results.length;
-            var embed = new EmbedBuilder()
-              .setAuthor({
-                name: "Is a dev BOT",
-                url: "https://is-a.dev",
-                iconURL: "https://raw.githubusercontent.com/is-a-dev/register/main/media/logo.png",
-              })
-              .setDescription("You own ``" + count + "`` domains")
-              .addFields(
-                {
-                  name: "Your Domains",
-                  value: ` ${results.join('\n')} `,
-                },
-              )
-              .setColor("#00b0f4")
-              .setFooter({
-                text: "©IS-A-DEV",
-                iconURL: "https://raw.githubusercontent.com/is-a-dev/register/main/media/logo.png",
-              });
-            await interaction.reply({ embeds: [embed] });
-          }
-  
-          if (!found) {
-            await interaction.reply(`Unable to find domains linked to user "${username}"!`);
-          }
-          });
-
-          return;
-    }
-    fetch('https://raw.is-a.dev')
-        .then(response => response.json())
-        .then(async data => {
-  
-          var found = false;
-          var results = [];
-  
-          for (var i = 0; i < data.length; i++) {
-              if (data[i].owner.username.toLowerCase() === username.toLowerCase()) {
-                results.push(data[i].domain);
-                found = true;
-              }
-          }
-          if (found) {
-            var count = results.length;
-            var embed = new EmbedBuilder()
-              .setAuthor({
-                name: "Is a dev BOT",
-                url: "https://is-a.dev",
-                iconURL: "https://raw.githubusercontent.com/is-a-dev/register/main/media/logo.png",
-              })
-              .setDescription(username + " owns ``" + count + "`` domains")
-              .addFields(
-                {
-                  name: "Domains",
-                  value: ` ${results.join('\n')} `,
-                },
-              )
-              .setColor("#00b0f4")
-              .setFooter({
-                text: "©IS-A-DEV",
-                iconURL: "https://raw.githubusercontent.com/is-a-dev/register/main/media/logo.png",
-              });
-            await interaction.reply({ embeds: [embed] });
-          }
-  
-          if (!found) {
-            await interaction.reply(`Username "${username}" has not registed any domains.`);
-          }
-          });
-
-
-    
-  }
-
-
-
-  if (interaction.commandName === "user") {
-    if (!betadb.has(interaction.user.id)) {
-      await interaction.reply("You are not in the beta program!");
-      return;
-    }
-    if (!db.has(interaction.user.id)) {
-      await interaction.reply("You are not logged in!");
-
-      return;
-    }
-
-    var message =
-      (await "Username: ") +
-      db.get(interaction.user.id) +
-      "\nEmail: " +
-      dbemail.get(interaction.user.id);
-
-    await interaction.reply({ content: message, ephemeral: true });
-  }
-
-  if (interaction.commandName === "new") {
-    if (!betadb.has(interaction.user.id)) {
-      await interaction.reply("You are not in the beta program!");
-      return;
-    }
-    if (!db.has(interaction.user.id)) {
-      await interaction.reply("You are not logged in!");
-
-      return;
-    }
-
-    await interaction.reply({ content: `Please Wait`, ephemeral: true });
-    var token = userdb.get(interaction.user.id);
-
-    console.log(token);
-
-    const response = await fetch("https://dns.beadman-network.com/api/fork", {
-      method: "get",
-      headers: {
-        "Content-Type": "application/json",
-
-        "x-gh-auth": token,
-      },
-    });
-    // check if the response is ok
-    if (!response.ok) {
-      // if not, throw an error
-      await interaction.editReply({ content: `Error has occured while forking the repo. HTTP error, status  ${response.status}`, ephemeral: true });
-      return;
-    }
-    await interaction.editReply({ content: `Forked`, ephemeral: true });
-
-    subdomain = interaction.options.getString("subdomain");
-
-    var type = interaction.options.getString("type");
-
-    var content = interaction.options.getString("content");
-
-    username = db.get(interaction.user.id);
-
-    var email = dbemail.get(interaction.user.id);
-
-    var prosubdomain = subdomain.toLowerCase();
-
+    var lowcaseDomain = domain.toLowerCase();
     var LowcaseContent = content.toLowerCase();
 
-    console.log("Request sent!");
-
-    const commit = await fetch("https://dns.beadman-network.com/api/commit", {
-      method: "post",
-
-      headers: {
-        "Content-Type": "application/json",
-
-        "x-gh-auth": token,
-
-        domain: prosubdomain,
-
-        email: email,
-
-        username: username,
-
-        type: type,
-
-        content: LowcaseContent,
-      },
-    });
-    // check if the response is ok
-    if (!commit.ok) {
-      // if not, throw an error
-      await interaction.editReply({ content: `Error has occured while commiting the repo. HTTP error, status  ${commit.status}`, ephemeral: true });
-      return;
+    if (type === "CNAME") {
+        if (isValidURL(LowcaseContent) === false) {
+            res.status(335);
+            throw new Error("Invalid Url!");
+        }
+    }
+    if (type === "A") {
+        if (ValidateIPaddress(LowcaseContent) === false) {
+            res.status(335);
+            throw new Error("Invalid IP!");
+        }
     }
 
-    console.log("Request sent!");
+    var validSubdomain = lowcaseDomain.replace(/\.is-a\.dev$/, "");
 
-    await interaction.editReply({
-      content: `Subdomain: ${subdomain}\nType: ${type}\nContent: ${content}`,
-      ephemeral: true,
-    });
+    if (type === "A" || type === "MX") {
+        LowcaseContent = JSON.stringify(
+            LowcaseContent.split(",").map((s) => s.trim())
+        );
+    } else {
+        LowcaseContent = `"${LowcaseContent.trim()}"`;
+    }
+
+    var fullContent = `{
+  "owner": {
+    "username": "${username}",
+    "email": "${email}"
+  },
+  "record": {
+    "${type}": ${LowcaseContent}
   }
+}
+`;
+    var contentEncoded = Base64.encode(fullContent);
+
+    octokit
+        .request("PUT /repos/{owner}/{repo}/contents/{path}", {
+            owner: username,
+            repo: "register",
+            path: "domains/" + validSubdomain + ".json",
+            message: "Added " + validSubdomain,
+            content: contentEncoded,
+        })
+        .catch((error) => {
+            res.sendStatus(3281);
+            throw new Error("Can't commit!");
+        });
+    await delay(1000);
+    let pr = await octokit
+        .request("POST /repos/{owner}/{repo}/pulls", {
+            owner: "is-a-dev",
+            repo: "register",
+            title: "Register " + validSubdomain + ".is-a.dev",
+            body: "Added `" + validSubdomain + "` via Discord",
+            head: username + ":main",
+            base: "main",
+        })
+        .catch((error) => {
+            res.sendStatus(3282);
+            throw new Error("Can't open PR!");
+        });
+    res.send(pr.response.data.html_url);
 });
 
+app.post("/api/privacy", upload.none(), (req, res) => {
+    const body = req.body;
 
+    console.log(`From: ${body.from}`);
+    var text = body.from;
 
+    var regex = /<(.*)>/g; // The actual regex
+    var matches = regex.exec(text);
+    var email = matches[1];
+    console.log(`To: ${body.to}`);
+    console.log(`Subject: ${body.subject}`);
+    console.log(`Text: ${body.text}`);
 
-keepAlive();
+    // if email is in the maintainers list, send the email
+    if (!maintainers.includes(email)) {
+        sgMail.send({
+            to: email,
+            from: "service@privacy.is-a.dev",
+            subject: "Not Authorized",
+            text: "Sorry your not authorized to use this service.",
+            html: "<strong>Sorry your not authorized to use this service</strong>",
+        });
+        console.log(`Email sent to ${email}`);
+    } else {
+        sgMail.send({
+            to: email,
+            from: "service@privacy.is-a.dev",
+            subject: "Email Sent",
+            text: "Your email has been sent.",
+            html: "<strong>Your email has been sent</strong>",
+        });
+        console.log(`Email sent to ${email}`);
 
-client.login(process.env.BOT_TOKEN);
+        return res.status(200).send();
+    }
+});
+
+app.post('/repos/:owner/:repo/issues/:issueNumber/comments', async (req, res, next) => {
+    try {
+      const isTokenValid = await checkToken(req.httpClient, req.header('temporary-github-token'))
+      if (!isTokenValid) {
+        throw new BadRequestError('must provide a valid temporary github token')
+      }
+  
+      const response = await createComment(req.httpClient, {
+        ...req.params,
+        ...req.body,
+        repoToken: process.env.GITHUB_TOKEN,
+      })
+  
+      res.status(200).send(response).end()
+    } catch (err) {
+      next(err)
+    }
+})
+
+const errorHandler = new ErrorHandler()
+errorHandler.setErrorEventHandler(err => console.log(JSON.stringify(err)))
+app.use(errorHandler.handle)
