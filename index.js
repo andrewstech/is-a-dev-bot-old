@@ -233,74 +233,13 @@ client.on("interactionCreate", async (interaction) => {
 
     await interaction.editReply({ components: [loginBtn], ephemeral: true });
   }
-  if (interaction.commandName === "maintainers") {
-    // make a discord modal with a dropdown of all the domains the user owns
-    // then delete the domain
-    //if user has role of maintainer then continue if not then return
-    if (!maintainerdb.has(interaction.user.id)) {
-      await interaction.reply("You are not a maintainer!");
-      return;
-    }
-    if (!db.has(interaction.user.id)) {
-      await interaction.reply("You are not logged in!");
-      return;
-    }
-    var username = db.get(interaction.user.id);
-    fetch('https://raw.is-a.dev')
-      .then(response => response.json())
-      .then(async data => {
-        var found = false;
-        var results = [];
-        for (var i = 0; i < data.length; i++) {
-            if (data[i].owner.username.toLowerCase() === username.toLowerCase()) {
-              results.push(data[i].domain);
-              found = true;
-            }
-        }
-        if (found) {
-          var count = results.length;
-          var domains = results;
-          const modal = new ModalBuilder()
-            .setCustomId('delteDomainModal')
-            .setTitle('Domain Deletion');
-
-          // Add components to modal
-
-          //add a select menu
-        
-
-          const domain = new TextInputBuilder()
-            .setCustomId('deletedomain')
-              // The label is the prompt the user sees for this input
-            .setLabel("What domain would you like to delete?")
-              // Short means only a single line of text
-            .setStyle(TextInputStyle.Short);
-
-
-          // An action row only holds one text input,
-          // so you need one action row per text input.
-          const firstActionRow = new ActionRowBuilder().addComponents(domain);
-
-          // Add inputs to the modal
-          modal.addComponents(firstActionRow);
-
-          // Show the modal to the user
-          await interaction.showModal(modal);
-        } else {
-          await interaction.reply("You do not own any domains!");
-        }
-      });
-
-  }
+  
           
-  client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isModalSubmit()) return;
-    if (interaction.customId === 'delteDomainModal') {
-      await interaction.reply({ content: 'Your submission was received successfully! However Im not going to delete that domain as I am not fully programmed.' });
-    }
-  });
-
   if (interaction.commandName === "domains") {
+    if (!betadb.has(interaction.user.id)) {
+      await interaction.reply("You are not in the beta program!");
+      return;
+    }
     var username = interaction.options.getString("username");
     if (username == null){
       // your code here.
@@ -493,15 +432,12 @@ client.on("interactionCreate", async (interaction) => {
       await interaction.editReply({ content: `Error has occured while commiting the repo. HTTP error, status  ${commit.status}`, ephemeral: true });
       return;
     }
+    await interaction.editReply({ content: `A PR has been opened `, ephemeral: true });
 
-    console.log("Request sent!");
-
-    await interaction.editReply({
-      content: `Subdomain: ${subdomain}\nType: ${type}\nContent: ${content}`,
-      ephemeral: true,
-    });
+    
   }
 });
+
 
 
 
